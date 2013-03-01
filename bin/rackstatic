@@ -1,0 +1,30 @@
+#!/usr/bin/env ruby
+
+require 'optparse'
+require 'ostruct'
+
+require 'rack/static-builder'
+
+opts = {}
+opts[:app_dir] = 'app'
+opts[:app_static_dir] = 'public'
+opts[:dest_dir] = 'build'
+opts[:noisy] = true
+
+OptionParser.new do |op|
+  op.banner = "Usage: rackstatic [opts]"
+
+  op.on("-a", "--app DIRECTORY", "Application directory (where config.ru is)"){ |v| opts[:app_dir] = v }
+  op.on("-s", "--static SUBDIRECTORY", "Directory within the app dir where static files are kept"){ |v| opts[:app_static_dir] = v }
+
+  op.on("-d", "--dest DIRECTORY", "Build output directory"){ |v| opts[:dest_dir] = v }
+
+  op.on("-q", "--quiet", "Build quietly"){ opts[:noisy] = false }
+end.parse!
+
+begin
+  Rack::StaticBuilder.new(opts).build!
+rescue ArgumentError
+  $stderr.puts "rackstatic: must be run within a rack-compatible application directory"
+  Kernel.exit 1
+end
