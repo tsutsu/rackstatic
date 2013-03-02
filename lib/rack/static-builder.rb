@@ -6,8 +6,9 @@ require 'rack/test'
 require 'nokogiri'
 
 class Rack::StaticBuilder
-  VERSION = '0.1.3'
+  VERSION = '0.1.4'
 
+  class BuildError < Exception; end
 
   class RequestPathQueue
     def initialize
@@ -52,30 +53,41 @@ class Rack::StaticBuilder
     @preserve_on_error = opts.delete(:preserve_on_error)
   end
 
-  def build!
+  def build
     @dest_dir.rmtree if @dest_dir.directory?
 
     queue = RequestPathQueue.new
 
     enqueue_static_assets(queue)
 
-    counts = {true => 0, false => 0}
+    req_stats = {
+      :status => Hash.new(0),
+      :category => Hash.new(0),
+      :succeeded => 0,
+      :failed => 0,
+      :total => 0
+    }
 
     with_rack_client do |client|
 
       queue.drain do |req_path|
         resp = client.get req_path
 
-        req_succeeded = (resp.status == 200)
+        req_status = resp.status
+        req_category = (req_status / 100)
+        req_succeeded = (req_category == 2)
 
-        counts[req_succeeded] += 1
+        req_stats[:status][req_status] += 1
+        req_stats[:category][req_category] += 1
+        req_stats[(req_succeeded ? :succeeded : :failed)] += 1
+        req_stats[:total] += 1
 
         if @noise_level > 1 or (!req_succeeded and @noise_level > 0)
           channel = req_succeeded ? $stdout : $stderr
-          channel.puts("#{resp.status} #{req_path}")
+          channel.puts("#{req_status} #{req_path}")
         end
 
-        next unless resp.status == 200
+        next unless req_succeeded
         next unless store_response!(req_path, resp.body)
 
         if enqueue_links = capture_method_for(resp.content_type)
@@ -85,13 +97,19 @@ class Rack::StaticBuilder
 
     end
 
-    build_succeeded = (counts[false] == 0)
-
-    unless build_succeeded or @preserve_on_error
+    if req_stats[:failed] > 0 and not @preserve_on_error
       @dest_dir.rmtree if @dest_dir.directory?
     end
 
-    build_succeeded
+    req_stats
+  end
+
+  def build!
+    req_stats = self.build
+
+    raise BuildError, "#{ req_stats[:failed] } URLs requested with non-2XX responses" unless (req_stats[:failed] == 0)
+
+    req_stats
   end
 
 

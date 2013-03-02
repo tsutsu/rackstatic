@@ -12,7 +12,7 @@ opts[:dest_dir] = 'dist'
 opts[:noise_level] = 1
 
 OptionParser.new do |op|
-  op.banner = "Usage: rackstatic [opts] [destination]"
+  op.banner = "Usage: #{File.basename($0)} [opts] [destination]"
 
   op.on("-a", "--app DIRECTORY", "Application directory (where config.ru is)"){ |v| opts[:app_dir] = v }
   op.on("-s", "--static SUBDIRECTORY", "Directory within the app dir where static files are kept"){ |v| opts[:app_static_dir] = v }
@@ -33,14 +33,14 @@ if ARGV.length == 1
 end
   
 begin
-  status = Rack::StaticBuilder.new(opts).build!
-
-  if opts[:noise_level] > 1
-    $stderr.puts "Build #{ status ? 'succeeded' : 'failed' }."
+  Rack::StaticBuilder.new(opts).build!
+rescue Rack::StaticBuilder::BuildError => e
+  if opts[:noise_level] > 0
+    $stderr.puts "#{File.basename($0)}: build failed - " + e.message
   end
 
-  Kernel.exit( status ? 0 : 1 )
+  Kernel.exit 1
 rescue ArgumentError
-  $stderr.puts "rackstatic: must be run within or above a rack-compatible application directory"
+  $stderr.puts "#{File.basename($0)}: must be run within or above a rack-compatible application directory"
   Kernel.exit 1
 end
