@@ -84,7 +84,7 @@ class Rack::StaticBuilder
 
     end
 
-    (counts[false] > 0)
+    (counts[false] == 0)
   end
 
 
