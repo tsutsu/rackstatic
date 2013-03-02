@@ -9,7 +9,7 @@ opts = {}
 opts[:app_dir] = 'app'
 opts[:app_static_dir] = 'public'
 opts[:dest_dir] = 'dist'
-opts[:noisy] = true
+opts[:noise_level] = 1
 
 OptionParser.new do |op|
   op.banner = "Usage: rackstatic [opts] [destination]"
@@ -19,7 +19,8 @@ OptionParser.new do |op|
 
   op.on("-d", "--dest DIRECTORY", "Build output directory"){ |v| opts[:dest_dir] = v }
 
-  op.on("-q", "--quiet", "Build quietly"){ opts[:noisy] = false }
+  op.on("-q", "--quiet", "Build quietly"){ opts[:noise_level] = 0 }
+  op.on("-v", "--verbose", "Build with lots of output"){ opts[:noise_level] = 2 }
 
   op.on_tail("-h", "--help", "Show this message") { puts opts; exit }
   op.on_tail("--version", "Show version") { puts Rack::StaticBuilder::VERSION }
@@ -31,6 +32,11 @@ end
   
 begin
   status = Rack::StaticBuilder.new(opts).build!
+
+  if opts[:noise_level] > 1
+    $stderr.puts "Build #{ status ? 'succeeded' : 'failed' }."
+  end
+
   Kernel.exit( status ? 0 : 1 )
 rescue ArgumentError
   $stderr.puts "rackstatic: must be run within or above a rack-compatible application directory"

@@ -6,7 +6,7 @@ require 'rack/test'
 require 'nokogiri'
 
 class Rack::StaticBuilder
-  VERSION = '0.1.1'
+  VERSION = '0.1.2'
 
 
   class RequestPathQueue
@@ -39,6 +39,8 @@ class Rack::StaticBuilder
 
 
   def initialize(opts)
+    opts = opts.dup
+
     @app_dir = [opts.delete(:app_dir), 'app', '.'].compact.find{ |d| File.file?(d + '/config.ru') }
     raise ArgumentError unless @app_dir
 
@@ -46,7 +48,7 @@ class Rack::StaticBuilder
     @dest_dir = Pathname.new(opts.delete(:dest_dir) || 'dist').expand_path.cleanpath
     @app_static_dir = (@app_dir + (opts.delete(:static_dir) || 'public')).expand_path.cleanpath
 
-    @noisy = opts.delete(:noisy)
+    @noise_level = (opts.delete(:noise_level) || '0').to_i
   end
 
   def build!
@@ -63,10 +65,13 @@ class Rack::StaticBuilder
       queue.drain do |req_path|
         resp = client.get req_path
 
-        if @noisy
-          channel = (resp.status == 200) ? $stdout : $stderr
+        req_succeeded = (resp.status == 200)
+
+        counts[req_succeeded] += 1
+
+        if @noise_level > 1 or (!req_succeeded and @noise_level > 0)
+          channel = req_succeeded ? $stdout : $stderr
           channel.puts("#{resp.status} #{req_path}")
-          counts[(resp.status == 200)] += 1
         end
 
         next unless resp.status == 200
@@ -77,10 +82,6 @@ class Rack::StaticBuilder
         end
       end
 
-    end
-
-    if @noisy and counts[false] > 0
-      $stderr.puts "\nFAILED: #{ counts[false] } requests returned non-200 and were discarded"
     end
 
     (counts[false] > 0)
