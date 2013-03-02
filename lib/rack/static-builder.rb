@@ -6,7 +6,7 @@ require 'rack/test'
 require 'nokogiri'
 
 class Rack::StaticBuilder
-  VERSION = '0.1.2'
+  VERSION = '0.1.3'
 
 
   class RequestPathQueue
@@ -49,6 +49,7 @@ class Rack::StaticBuilder
     @app_static_dir = (@app_dir + (opts.delete(:static_dir) || 'public')).expand_path.cleanpath
 
     @noise_level = (opts.delete(:noise_level) || '0').to_i
+    @preserve_on_error = opts.delete(:preserve_on_error)
   end
 
   def build!
@@ -84,7 +85,13 @@ class Rack::StaticBuilder
 
     end
 
-    (counts[false] == 0)
+    build_succeeded = (counts[false] == 0)
+
+    unless build_succeeded or @preserve_on_error
+      @dest_dir.rmtree if @dest_dir.directory?
+    end
+
+    build_succeeded
   end
 
 

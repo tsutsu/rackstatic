@@ -19,6 +19,8 @@ OptionParser.new do |op|
 
   op.on("-d", "--dest DIRECTORY", "Build output directory"){ |v| opts[:dest_dir] = v }
 
+  op.on("-p", "--preserve-on-error", "Keep the build output even if the build fails"){ opts[:preserve_on_error] = true }
+
   op.on("-q", "--quiet", "Build quietly"){ opts[:noise_level] = 0 }
   op.on("-v", "--verbose", "Build with lots of output"){ opts[:noise_level] = 2 }
 
