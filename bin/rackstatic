@@ -8,11 +8,11 @@ require 'rack/static-builder'
 opts = {}
 opts[:app_dir] = 'app'
 opts[:app_static_dir] = 'public'
-opts[:dest_dir] = 'build'
+opts[:dest_dir] = 'dist'
 opts[:noisy] = true
 
 OptionParser.new do |op|
-  op.banner = "Usage: rackstatic [opts]"
+  op.banner = "Usage: rackstatic [opts] [destination]"
 
   op.on("-a", "--app DIRECTORY", "Application directory (where config.ru is)"){ |v| opts[:app_dir] = v }
   op.on("-s", "--static SUBDIRECTORY", "Directory within the app dir where static files are kept"){ |v| opts[:app_static_dir] = v }
@@ -20,11 +20,19 @@ OptionParser.new do |op|
   op.on("-d", "--dest DIRECTORY", "Build output directory"){ |v| opts[:dest_dir] = v }
 
   op.on("-q", "--quiet", "Build quietly"){ opts[:noisy] = false }
+
+  op.on_tail("-h", "--help", "Show this message") { puts opts; exit }
+  op.on_tail("--version", "Show version") { puts Rack::StaticBuilder::VERSION }
 end.parse!
 
+if ARGV.length == 1
+  opts[:dest_dir] = ARGV.shift
+end
+  
 begin
-  Rack::StaticBuilder.new(opts).build!
+  status = Rack::StaticBuilder.new(opts).build!
+  Kernel.exit( status ? 0 : 1 )
 rescue ArgumentError
-  $stderr.puts "rackstatic: must be run within a rack-compatible application directory"
+  $stderr.puts "rackstatic: must be run within or above a rack-compatible application directory"
   Kernel.exit 1
 end

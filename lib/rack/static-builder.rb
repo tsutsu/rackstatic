@@ -6,7 +6,7 @@ require 'rack/test'
 require 'nokogiri'
 
 class Rack::StaticBuilder
-  VERSION = '0.1.0'
+  VERSION = '0.1.1'
 
 
   class RequestPathQueue
@@ -19,8 +19,11 @@ class Rack::StaticBuilder
     def enqueue(url)
       path = URI.parse(url).path
 
+      # discard URNs like data: and magnet:
+      return false unless path
+
       if path[0] != '/'
-        path = (@active || '/').sub(/\/[^\/]*$/, '') + '/' + path
+        path = URI.parse( (@active || '/').sub(/\/[^\/]*$/, '') + '/' + path ).path
       end
 
       @queue << path
@@ -40,7 +43,7 @@ class Rack::StaticBuilder
     raise ArgumentError unless @app_dir
 
     @app_dir = Pathname.new(@app_dir).expand_path.cleanpath
-    @dest_dir = Pathname.new(opts.delete(:dest_dir) || 'build').expand_path.cleanpath
+    @dest_dir = Pathname.new(opts.delete(:dest_dir) || 'dist').expand_path.cleanpath
     @app_static_dir = (@app_dir + (opts.delete(:static_dir) || 'public')).expand_path.cleanpath
 
     @noisy = opts.delete(:noisy)
@@ -53,6 +56,8 @@ class Rack::StaticBuilder
 
     enqueue_static_assets(queue)
 
+    counts = {true => 0, false => 0}
+
     with_rack_client do |client|
 
       queue.drain do |req_path|
@@ -61,6 +66,7 @@ class Rack::StaticBuilder
         if @noisy
           channel = (resp.status == 200) ? $stdout : $stderr
           channel.puts("#{resp.status} #{req_path}")
+          counts[(resp.status == 200)] += 1
         end
 
         next unless resp.status == 200
@@ -72,6 +78,12 @@ class Rack::StaticBuilder
       end
 
     end
+
+    if @noisy and counts[false] > 0
+      $stderr.puts "\nFAILED: #{ counts[false] } requests returned non-200 and were discarded"
+    end
+
+    (counts[false] > 0)
   end
 
 
